@@ -3,9 +3,7 @@ from lexer import tokenize
 
 code = '''
 int main() {
-
-    int age = @18;
-
+    char grade = 'A';
 }
 '''
 

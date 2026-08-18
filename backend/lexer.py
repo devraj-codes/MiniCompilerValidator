@@ -8,6 +8,7 @@ errors = []
 # --------------------------------------------------
 
 tokens = (
+    'CHARACTER',
     'IDENTIFIER',
     'NUMBER',
     'STRING',
@@ -206,3 +207,7 @@ def tokenize(code):
         })
 
     return tokens, errors
+
+def t_CHARACTER(t):
+    r"'([^'\\]|\\.)'"
+    return t
