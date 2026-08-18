@@ -274,6 +274,61 @@ validateBtn.addEventListener("click", async function () {
 
         }
 
+        // -----------------------------------------
+        // DISPLAY PDA / BRACKET VALIDATION
+        // -----------------------------------------
+
+        const bracketErrors =
+            data.bracket_errors || [];
+
+
+        if (bracketErrors.length === 0) {
+
+            const pdaElement =
+                document.createElement("div");
+
+            pdaElement.className =
+                "pda-success";
+
+            pdaElement.innerHTML = `
+                <strong>PDA / Bracket Analysis</strong><br>
+                ✓ All brackets are balanced.
+            `;
+
+            errorList.appendChild(pdaElement);
+
+        } else {
+
+            const pdaHeading =
+                document.createElement("div");
+
+            pdaHeading.innerHTML = `
+                <strong>PDA / Bracket Errors</strong>
+            `;
+
+            errorList.appendChild(pdaHeading);
+
+
+            bracketErrors.forEach(function (error) {
+
+                const errorElement =
+                    document.createElement("div");
+
+                errorElement.className =
+                    "error";
+
+                errorElement.innerHTML = `
+                    <strong>${error.type}</strong><br>
+                    ${error.message}<br>
+                    Line: ${error.line}
+                `;
+
+                errorList.appendChild(errorElement);
+
+            });
+
+        }
+
 
         // -----------------------------------------
         // FINAL STATUS
