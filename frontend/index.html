@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Mini Compiler Validator</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Mini Compiler Validator</h1>
+
+        <p>Enter your C code below:</p>
+
+        <textarea id="codeInput" placeholder="Write your C code here..."></textarea>
+
+        <button id="validateBtn">
+            Validate Code
+        </button>
+
+        <div id="result">
+
+        <h2>Tokens</h2>
+
+        <table id="tokenTable">
+
+            <thead>
+                <tr>
+                    <th>Lexeme</th>
+                    <th>Token Type</th>
+                    <th>Line</th>
+                </tr>
+            </thead>
+
+            <tbody id="tokenTableBody">
+            </tbody>
+
+        </table>
+
+        <h2>Errors</h2>
+
+        <div id="errorList">
+        No errors yet.
+        </div>
+
+    </div>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
