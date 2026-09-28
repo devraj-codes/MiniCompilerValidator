@@ -3,111 +3,512 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mini Compiler Validator</title>
+    <title>Mini Compiler Validator | TOC-Powered Mini-C Code Analyzer</title>
 
-    <!-- Optional fonts: the app falls back to system fonts if these fail to load -->
+    <!-- Google Fonts: Inter & JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-
-    <header class="app-header">
-        <div class="brand">
-            <div class="logo" aria-hidden="true">&lt;/&gt;</div>
-            <div>
-                <h1>Mini Compiler Validator</h1>
-                <p class="subtitle">Lexical Analysis &amp; Syntax Validation</p>
-            </div>
-        </div>
-        <div class="status" id="backendStatus" data-state="ready" role="status">
-            <span class="dot" aria-hidden="true"></span>
-            <span id="backendStatusText">Ready</span>
-        </div>
-    </header>
-
-    <main class="dashboard">
-
-        <!-- ============ EDITOR ============ -->
-        <section class="panel editor-panel" aria-labelledby="editorTitle">
-            <div class="panel-head">
-                <h2 id="editorTitle"><span class="lang-chip">C</span> Source code</h2>
-                <span class="counter" id="editorCounter">0 lines · 0 chars</span>
-            </div>
-
-            <div class="editor">
-                <div class="gutter" id="lineNumbers" aria-hidden="true">1</div>
-                <label for="codeInput" class="visually-hidden">C source code</label>
-                <textarea id="codeInput" spellcheck="false" autocomplete="off"
-                    placeholder="#include &lt;stdio.h&gt;&#10;&#10;int main() {&#10;    int count = 0;&#10;    return 0;&#10;}"></textarea>
+    <div class="app-wrapper">
+        <!-- ========================================================= -->
+        <!-- HEADER -->
+        <!-- ========================================================= -->
+        <header class="app-header">
+            <div class="header-left">
+                <div class="brand">
+                    <div class="logo-icon" aria-hidden="true">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="16 18 22 12 16 6"></polyline>
+                            <polyline points="8 6 2 12 8 18"></polyline>
+                            <circle cx="12" cy="12" r="2"></circle>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <div class="title-row">
+                            <h1>Mini Compiler Validator</h1>
+                            <span class="version-tag">v2.0 · TOC Engine</span>
+                        </div>
+                        <p class="subtitle">TOC-Powered Mini-C Code Analyzer</p>
+                    </div>
+                </div>
             </div>
 
-            <div class="editor-actions">
-                <button id="validateBtn" type="button">
-                    <span class="btn-icon" aria-hidden="true">✓</span>
-                    <span class="btn-label">Validate Code</span>
-                </button>
-                <span class="hint">Runs against your Flask server on port 5000</span>
-            </div>
-        </section>
-
-        <!-- ============ RESULTS ============ -->
-        <div id="result">
-
-            <section class="stats" aria-label="Validation overview">
-                <div class="stat"><span class="stat-label">Tokens</span><span class="stat-value" id="statTokens">–</span></div>
-                <div class="stat"><span class="stat-label">Identifiers</span><span class="stat-value" id="statIdentifiers">–</span></div>
-                <div class="stat" id="statErrorsCard"><span class="stat-label">Errors</span><span class="stat-value" id="statErrors">–</span></div>
-                <div class="stat" id="statBracketsCard"><span class="stat-label">Brackets</span><span class="stat-value" id="statBrackets">–</span></div>
-            </section>
-
-            <div id="banner" class="banner" hidden></div>
-
-            <section class="panel results-panel">
-                <div class="tabs" role="tablist" aria-label="Validation results">
-                    <button class="tab" role="tab" id="tab-tokens" aria-controls="panel-tokens" aria-selected="true">Tokens</button>
-                    <button class="tab" role="tab" id="tab-errors" aria-controls="panel-errors" aria-selected="false" tabindex="-1">Errors</button>
-                    <button class="tab" role="tab" id="tab-identifiers" aria-controls="panel-identifiers" aria-selected="false" tabindex="-1">Identifiers</button>
-                    <button class="tab" role="tab" id="tab-brackets" aria-controls="panel-brackets" aria-selected="false" tabindex="-1">Brackets</button>
+            <div class="header-right">
+                <div class="status-indicator" id="backendStatus" data-state="ready" role="status" title="Flask Backend Connection Status">
+                    <span class="status-dot" aria-hidden="true"></span>
+                    <span class="status-label">Backend:</span>
+                    <span class="status-text" id="backendStatusText">Ready</span>
                 </div>
 
-                <div class="tab-panel" id="panel-tokens" role="tabpanel" aria-labelledby="tab-tokens">
-                    <h2 class="visually-hidden">Tokens</h2>
-                    <div class="table-wrap">
-                        <table id="tokenTable">
-                            <thead>
-                                <tr>
-                                    <th scope="col">Lexeme</th>
-                                    <th scope="col">Token Type</th>
-                                    <th scope="col">Line</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tokenTableBody"></tbody>
-                        </table>
+                <button id="validateBtn" type="button" class="btn-validate" title="Validate Code (Ctrl + Enter)">
+                    <span class="btn-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                        </svg>
+                    </span>
+                    <span class="btn-label">Validate Code</span>
+                    <span class="btn-kbd">Ctrl+↵</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- ========================================================= -->
+        <!-- MAIN DASHBOARD -->
+        <!-- ========================================================= -->
+        <main class="dashboard">
+
+            <!-- ============ LEFT: CODE EDITOR ============ -->
+            <section class="panel editor-panel" aria-label="C Source Code Editor">
+                <div class="editor-header">
+                    <div class="window-decorations" aria-hidden="true">
+                        <span class="dot-btn red"></span>
+                        <span class="dot-btn yellow"></span>
+                        <span class="dot-btn green"></span>
+                    </div>
+
+                    <div class="file-tab active">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="file-icon">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                        <span class="file-name">main.c</span>
+                        <span class="lang-badge">Mini-C</span>
+                    </div>
+
+                    <div class="editor-toolbar">
+                        <div class="preset-dropdown-wrap">
+                            <label for="sampleSelect" class="visually-hidden">Load Sample Code</label>
+                            <select id="sampleSelect" class="select-preset" title="Load sample test cases">
+                                <option value="" disabled selected>Load Sample Preset...</option>
+                                <option value="valid">✓ Valid Program</option>
+                                <option value="dfa-error">✕ DFA Error (Invalid Identifier: 5student)</option>
+                                <option value="pda-error">✕ PDA Error (Unbalanced Brackets: '{')</option>
+                                <option value="lexical-error">✕ Lexical Error (Illegal Symbol: '@')</option>
+                                <option value="complex-valid">✓ Control Flow (If / While / Printf)</option>
+                            </select>
+                        </div>
+
+                        <button type="button" id="copyCodeBtn" class="btn-tool" title="Copy code to clipboard">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            <span>Copy</span>
+                        </button>
+
+                        <button type="button" id="clearCodeBtn" class="btn-tool" title="Clear editor">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span>Clear</span>
+                        </button>
                     </div>
                 </div>
 
-                <div class="tab-panel" id="panel-errors" role="tabpanel" aria-labelledby="tab-errors" hidden>
-                    <h2 class="visually-hidden">Errors</h2>
-                    <div id="errorList">No errors yet.</div>
+                <!-- Editor Workspace -->
+                <div class="editor-workspace">
+                    <div class="gutter" id="lineNumbers" aria-hidden="true">1</div>
+                    <label for="codeInput" class="visually-hidden">C source code</label>
+                    <textarea id="codeInput" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"
+                        placeholder="int main() {&#10;    int x = 10;&#10;&#10;    if (x > 5) {&#10;        printf(&quot;Hello&quot;);&#10;    }&#10;&#10;    return 0;&#10;}"></textarea>
                 </div>
 
-                <div class="tab-panel" id="panel-identifiers" role="tabpanel" aria-labelledby="tab-identifiers" hidden>
-                    <h2 class="visually-hidden">Identifier Validation</h2>
-                    <div id="identifierList">No identifier analysis yet.</div>
-                </div>
-
-                <div class="tab-panel" id="panel-brackets" role="tabpanel" aria-labelledby="tab-brackets" hidden>
-                    <h2 class="visually-hidden">PDA / Bracket Analysis</h2>
-                    <div id="bracketList">No bracket analysis yet.</div>
+                <!-- Editor Status Bar -->
+                <div class="editor-statusbar">
+                    <div class="status-left">
+                        <span class="counter" id="editorCounter">0 lines · 0 chars</span>
+                        <span class="encoding-tag">UTF-8</span>
+                        <span class="indent-tag">Spaces: 4</span>
+                    </div>
+                    <div class="status-right">
+                        <span class="keyboard-hint">Press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to validate</span>
+                    </div>
                 </div>
             </section>
-        </div>
-    </main>
 
+            <!-- ============ RIGHT: RESULTS DASHBOARD ============ -->
+            <section class="panel results-container" id="result" aria-label="Validation Analysis Results">
+
+                <!-- OVERALL STATUS CARD -->
+                <div class="overall-status-card ready" id="overallStatusCard">
+                    <div class="status-hero" id="statusHero">
+                        <div class="status-hero-icon" id="heroIcon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                        </div>
+                        <div class="status-hero-content">
+                            <div class="hero-status-title" id="heroTitle">READY FOR VALIDATION</div>
+                            <div class="hero-status-subtitle" id="heroSubtitle">Enter Mini-C source code and click "Validate Code" to run TOC analysis.</div>
+                        </div>
+                    </div>
+
+                    <!-- TOC Pipeline Stages Tracker -->
+                    <div class="pipeline-section">
+                        <div class="pipeline-header">
+                            <span class="pipeline-title">COMPILER / TOC PIPELINE STAGES</span>
+                            <span class="pipeline-sub">Formal Languages &amp; Automata Verification</span>
+                        </div>
+                        <div class="pipeline-grid">
+                            <div class="pipeline-stage" id="pipeLexer">
+                                <span class="stage-dot"></span>
+                                <div class="stage-info">
+                                    <span class="stage-name">Lexical Analysis</span>
+                                    <span class="stage-sub">Scanner · Σ Tokens</span>
+                                </div>
+                                <span class="stage-state">Pending</span>
+                            </div>
+
+                            <div class="pipeline-stage" id="pipeDfa">
+                                <span class="stage-dot"></span>
+                                <div class="stage-info">
+                                    <span class="stage-name">DFA Validation</span>
+                                    <span class="stage-sub">Finite Automaton M</span>
+                                </div>
+                                <span class="stage-state">Pending</span>
+                            </div>
+
+                            <div class="pipeline-stage" id="pipePda">
+                                <span class="stage-dot"></span>
+                                <div class="stage-info">
+                                    <span class="stage-name">PDA Validation</span>
+                                    <span class="stage-sub">Stack Automaton</span>
+                                </div>
+                                <span class="stage-state">Pending</span>
+                            </div>
+
+                            <div class="pipeline-stage" id="pipeCfg">
+                                <span class="stage-dot"></span>
+                                <div class="stage-info">
+                                    <span class="stage-name">CFG Syntax Analysis</span>
+                                    <span class="stage-sub">Grammar Rules</span>
+                                </div>
+                                <span class="stage-state">Ready</span>
+                            </div>
+
+                            <div class="pipeline-stage" id="pipeTree">
+                                <span class="stage-dot"></span>
+                                <div class="stage-info">
+                                    <span class="stage-name">Parse Tree</span>
+                                    <span class="stage-sub">Graphviz AST</span>
+                                </div>
+                                <span class="stage-state">Planned</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metric Counters Strip -->
+                    <div class="stats-strip" aria-label="Validation Metrics">
+                        <div class="stat-box" id="statTokensCard">
+                            <div class="stat-header">
+                                <span class="stat-label">TOKENS GENERATED</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                            </div>
+                            <span class="stat-value" id="statTokens">–</span>
+                        </div>
+
+                        <div class="stat-box" id="statIdentifiersCard">
+                            <div class="stat-header">
+                                <span class="stat-label">DFA IDENTIFIERS</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </div>
+                            <span class="stat-value" id="statIdentifiers">–</span>
+                        </div>
+
+                        <div class="stat-box" id="statErrorsCard">
+                            <div class="stat-header">
+                                <span class="stat-label">TOTAL ISSUES</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            </div>
+                            <span class="stat-value" id="statErrors">–</span>
+                        </div>
+
+                        <div class="stat-box" id="statBracketsCard">
+                            <div class="stat-header">
+                                <span class="stat-label">PDA BRACKETS</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"></polyline><line x1="9" y1="20" x2="15" y2="20"></line><line x1="12" y1="4" x2="12" y2="20"></line></svg>
+                            </div>
+                            <span class="stat-value" id="statBrackets">–</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation Filter Bar -->
+                <div class="stage-nav-bar" role="navigation" aria-label="Analysis Cards Filter">
+                    <span class="nav-label">STAGE VIEWS:</span>
+                    <div class="nav-pills">
+                        <button type="button" class="nav-pill active" data-target="all">All Stages (6)</button>
+                        <button type="button" class="nav-pill" data-target="card-tokens">Tokens <span class="pill-badge" id="navBadgeTokens">0</span></button>
+                        <button type="button" class="nav-pill" data-target="card-identifiers">DFA Identifiers <span class="pill-badge" id="navBadgeDfa">0</span></button>
+                        <button type="button" class="nav-pill" data-target="card-brackets">PDA Brackets <span class="pill-badge" id="navBadgePda">0</span></button>
+                        <button type="button" class="nav-pill" data-target="card-lexical">Lexical Errors <span class="pill-badge" id="navBadgeLex">0</span></button>
+                        <button type="button" class="nav-pill" data-target="card-syntax">CFG Syntax</button>
+                        <button type="button" class="nav-pill" data-target="card-parsetree">Parse Tree</button>
+                    </div>
+                </div>
+
+                <!-- Legacy notification banner (kept for backward-compatibility) -->
+                <div id="banner" class="banner" hidden></div>
+
+                <!-- ========================================================= -->
+                <!-- SEPARATE MODERN CARDS -->
+                <!-- ========================================================= -->
+                <div class="cards-stack">
+
+                    <!-- CARD 1: TOKEN ANALYSIS -->
+                    <section class="result-card" id="card-tokens" aria-labelledby="tokensCardTitle">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="card-icon cyan">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                                        <line x1="9" y1="20" x2="15" y2="20"></line>
+                                        <line x1="12" y1="4" x2="12" y2="20"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="card-title-row">
+                                        <h2 id="tokensCardTitle">CARD 1 — TOKEN ANALYSIS</h2>
+                                        <span class="toc-tag">LEXER</span>
+                                        <span class="badge-count" id="tokenCountBadge">0 tokens</span>
+                                    </div>
+                                    <p class="card-desc">Lexeme stream generated by scanner with token classifications and source positions.</p>
+                                </div>
+                            </div>
+
+                            <div class="card-header-actions">
+                                <div class="search-box">
+                                    <input type="text" id="tokenSearchInput" placeholder="Filter tokens..." aria-label="Filter tokens">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="table-wrap">
+                                <table id="tokenTable">
+                                    <thead>
+                                        <tr>
+                                            <th scope="col" style="width: 35%;">Lexeme</th>
+                                            <th scope="col" style="width: 40%;">Token Type</th>
+                                            <th scope="col" style="width: 25%;">Line : Col</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="tokenTableBody">
+                                        <tr>
+                                            <td colspan="3">
+                                                <div class="empty-state">
+                                                    <div class="empty-icon">&lt;/&gt;</div>
+                                                    <div class="empty-title">No tokens generated yet</div>
+                                                    <p>Run validation to tokenize Mini-C source code.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CARD 2: DFA / IDENTIFIER ANALYSIS -->
+                    <section class="result-card" id="card-identifiers" aria-labelledby="dfaCardTitle">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="card-icon purple">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="6" cy="6" r="3"></circle>
+                                        <circle cx="18" cy="18" r="3"></circle>
+                                        <line x1="8.59" y1="8.59" x2="15.42" y2="15.42"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="card-title-row">
+                                        <h2 id="dfaCardTitle">CARD 2 — DFA / IDENTIFIER ANALYSIS</h2>
+                                        <span class="toc-tag">DFA M = (Q, Σ, δ, q₀, F)</span>
+                                        <span class="badge-status" id="dfaStatusBadge">Pending</span>
+                                    </div>
+                                    <p class="card-desc">Deterministic Finite Automaton validates identifiers against <code>[a-zA-Z_][a-zA-Z0-9_]*</code> and reserved words.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div id="identifierList">
+                                <div class="empty-state">
+                                    <div class="empty-icon">DFA</div>
+                                    <div class="empty-title">No identifier analysis yet</div>
+                                    <p>Identified tokens will be processed through the DFA state transitions.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CARD 3: PDA / BRACKET ANALYSIS -->
+                    <section class="result-card" id="card-brackets" aria-labelledby="pdaCardTitle">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="card-icon blue">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                                        <path d="M7 15h0M7 9h0M12 15h0M12 9h0M17 15h0M17 9h0"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="card-title-row">
+                                        <h2 id="pdaCardTitle">CARD 3 — PDA / BRACKET ANALYSIS</h2>
+                                        <span class="toc-tag">PDA M = (Q, Σ, Γ, δ, q₀, z₀, F)</span>
+                                        <span class="badge-status" id="pdaStatusBadge">Pending</span>
+                                    </div>
+                                    <p class="card-desc">Pushdown Automaton validates nested parentheses <code>()</code>, curly braces <code>{}</code>, and brackets <code>[]</code> via LIFO stack.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div id="bracketList">
+                                <div class="empty-state">
+                                    <div class="empty-icon">{ }</div>
+                                    <div class="empty-title">No bracket analysis yet</div>
+                                    <p>Brackets will be pushed and popped on the PDA stack to check balance.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CARD 4: LEXICAL ERRORS -->
+                    <section class="result-card" id="card-lexical" aria-labelledby="lexicalCardTitle">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="card-icon amber">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="card-title-row">
+                                        <h2 id="lexicalCardTitle">CARD 4 — LEXICAL ERRORS</h2>
+                                        <span class="toc-tag">SCANNER Σ</span>
+                                        <span class="badge-status" id="lexicalStatusBadge">Pending</span>
+                                    </div>
+                                    <p class="card-desc">Reports characters or sequences rejected by the lexical grammar specification.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div id="errorList">
+                                <div class="empty-state">
+                                    <div class="empty-icon">✓</div>
+                                    <div class="empty-title">No lexical scan performed yet</div>
+                                    <p>Errors like illegal symbols or unclosed comments will appear here.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CARD 5: CFG / SYNTAX ANALYSIS -->
+                    <section class="result-card" id="card-syntax" aria-labelledby="syntaxCardTitle">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="card-icon emerald">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 20h9"></path>
+                                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="card-title-row">
+                                        <h2 id="syntaxCardTitle">CARD 5 — CFG / SYNTAX ANALYSIS</h2>
+                                        <span class="toc-tag">CFG G = (V, Σ, R, S)</span>
+                                        <span class="badge-status ready">Ready for Parser</span>
+                                    </div>
+                                    <p class="card-desc">Validates program sentence structure against Mini-C Context-Free production rules.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div id="syntaxAnalysisContainer">
+                                <div class="syntax-ready-banner">
+                                    <div class="banner-top">
+                                        <span class="glyph-badge">CFG</span>
+                                        <div class="banner-text">
+                                            <div class="banner-title">Parser Interface Ready</div>
+                                            <div class="banner-desc">This panel automatically renders parser results once backend syntax analysis is invoked.</div>
+                                        </div>
+                                    </div>
+                                    <div class="grammar-snippet">
+                                        <div class="snippet-label">Sample Grammar Rules:</div>
+                                        <code>program &rarr; function_definition<br>
+                                        function_definition &rarr; datatype IDENTIFIER LPAREN RPAREN block<br>
+                                        block &rarr; LBRACE statement_list RBRACE<br>
+                                        statement &rarr; declaration | assignment | if_stmt | while_stmt | printf_stmt | return_stmt</code>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CARD 6: PARSE TREE -->
+                    <section class="result-card" id="card-parsetree" aria-labelledby="parseTreeCardTitle">
+                        <div class="card-header">
+                            <div class="card-title-group">
+                                <div class="card-icon rose">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="5" r="3"></circle>
+                                        <circle cx="6" cy="19" r="3"></circle>
+                                        <circle cx="18" cy="19" r="3"></circle>
+                                        <path d="M12 8v4"></path>
+                                        <path d="M12 12l-6 4"></path>
+                                        <path d="M12 12l6 4"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="card-title-row">
+                                        <h2 id="parseTreeCardTitle">CARD 6 — PARSE TREE</h2>
+                                        <span class="toc-tag">GRAPHVIZ VISUALIZATION</span>
+                                        <span class="badge-status planned">Pipeline Slot</span>
+                                    </div>
+                                    <p class="card-desc">Hierarchical syntax derivation graph generated from grammar productions.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="parse-tree-canvas" id="parseTreeContainer">
+                                <div class="tree-placeholder">
+                                    <div class="tree-wireframe" aria-hidden="true">
+                                        <div class="tree-node root">program</div>
+                                        <div class="tree-branches">
+                                            <div class="tree-node">func_def</div>
+                                            <div class="tree-node">block</div>
+                                        </div>
+                                    </div>
+                                    <div class="tree-msg-title">Parse tree will appear here after syntax analysis.</div>
+                                    <p class="tree-msg-sub">Container pre-configured for inline SVG / Graphviz DOT hierarchy rendering.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                </div><!-- /cards-stack -->
+            </section>
+        </main>
+    </div>
+
+    <!-- Application JavaScript -->
     <script src="script.js"></script>
 </body>
 </html>
