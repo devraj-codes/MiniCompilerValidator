@@ -1,3 +1,15 @@
+"""Bracket validator implemented as a pushdown automaton.
+
+Stack alphabet : the opening brackets ( { [
+Transitions    : on an opening bracket -> push it
+                 on a closing bracket  -> pop and compare with the match
+Accept         : input finished with an empty stack and no errors
+
+Strings, character literals and comments are skipped so brackets inside
+them are ignored. Unterminated literals and comments are reported by the
+lexer; here they only stop the scan from swallowing the rest of the file.
+"""
+
 OPENING_BRACKETS = {
     "(": ")",
     "{": "}",
@@ -12,193 +24,141 @@ CLOSING_BRACKETS = {
 
 
 def validate_brackets(code):
-    stack = []
+    stack = []          # entries: (bracket, line, column)
     errors = []
 
     line_number = 1
+    line_start = 0      # index where the current line begins
     i = 0
+    n = len(code)
 
-    # States
-    in_string = False
-    in_character = False
-    in_single_comment = False
-    in_multi_comment = False
-
-    while i < len(code):
+    while i < n:
 
         character = code[i]
+        next_character = code[i + 1] if i + 1 < n else ""
 
         # =========================================
-        # INSIDE SINGLE-LINE COMMENT
+        # NEWLINE
         # =========================================
-        if in_single_comment:
-
-            if character == "\n":
-                in_single_comment = False
-                line_number += 1
-
+        if character == "\n":
+            line_number += 1
+            line_start = i + 1
             i += 1
             continue
 
         # =========================================
-        # INSIDE MULTI-LINE COMMENT
+        # SINGLE-LINE COMMENT: skip to end of line
         # =========================================
-        if in_multi_comment:
-
-            # Check for */
-            if (
-                character == "*"
-                and i + 1 < len(code)
-                and code[i + 1] == "/"
-            ):
-                in_multi_comment = False
-                i += 2
-                continue
-
-            if character == "\n":
-                line_number += 1
-
-            i += 1
+        if character == "/" and next_character == "/":
+            while i < n and code[i] != "\n":
+                i += 1
             continue
 
         # =========================================
-        # INSIDE STRING
+        # MULTI-LINE COMMENT: skip to */ (or end of file)
         # =========================================
-        if in_string:
-
-            # Handle escaped characters
-            # Example: \" or \\
-            if character == "\\":
-                i += 2
-                continue
-
-            # End of string
-            if character == '"':
-                in_string = False
-
-            if character == "\n":
-                line_number += 1
-
-            i += 1
-            continue
-
-        # =========================================
-        # INSIDE CHARACTER LITERAL
-        # =========================================
-        if in_character:
-
-            # Handle escaped characters
-            # Example: \' or \\
-            if character == "\\":
-                i += 2
-                continue
-
-            # End of character literal
-            if character == "'":
-                in_character = False
-
-            if character == "\n":
-                line_number += 1
-
-            i += 1
-            continue
-
-        # =========================================
-        # START SINGLE-LINE COMMENT
-        # =========================================
-        if (
-            character == "/"
-            and i + 1 < len(code)
-            and code[i + 1] == "/"
-        ):
-            in_single_comment = True
+        if character == "/" and next_character == "*":
             i += 2
+
+            while i < n:
+
+                if code[i] == "*" and i + 1 < n and code[i + 1] == "/":
+                    i += 2
+                    break
+
+                if code[i] == "\n":
+                    line_number += 1
+                    line_start = i + 1
+
+                i += 1
+
             continue
 
         # =========================================
-        # START MULTI-LINE COMMENT
+        # STRING OR CHARACTER LITERAL
         # =========================================
-        if (
-            character == "/"
-            and i + 1 < len(code)
-            and code[i + 1] == "*"
-        ):
-            in_multi_comment = True
-            i += 2
-            continue
-
-        # =========================================
-        # START STRING
-        # =========================================
-        if character == '"':
-            in_string = True
+        # A literal cannot span lines, so it also ends at a newline.
+        # That keeps one missing quote from hiding every later bracket.
+        if character == '"' or character == "'":
+            quote = character
             i += 1
+
+            while i < n:
+
+                current = code[i]
+
+                if current == "\\":
+                    # Backslash before a newline: treat the literal as
+                    # unterminated instead of splicing the lines.
+                    if i + 1 < n and code[i + 1] == "\n":
+                        i += 1
+                        break
+
+                    i += 2      # skip the escaped character
+                    continue
+
+                if current == quote:
+                    i += 1
+                    break
+
+                if current == "\n":
+                    break       # newline handled by the main loop
+
+                i += 1
+
             continue
 
         # =========================================
-        # START CHARACTER LITERAL
-        # =========================================
-        if character == "'":
-            in_character = True
-            i += 1
-            continue
-
-        # =========================================
-        # OPENING BRACKET
+        # OPENING BRACKET: push
         # =========================================
         if character in OPENING_BRACKETS:
 
-            stack.append(
-                (character, line_number)
-            )
+            stack.append((
+                character,
+                line_number,
+                i - line_start + 1
+            ))
 
         # =========================================
-        # CLOSING BRACKET
+        # CLOSING BRACKET: pop and compare
         # =========================================
         elif character in CLOSING_BRACKETS:
 
-            # No opening bracket exists
+            column = i - line_start + 1
+
             if not stack:
 
                 errors.append({
                     "type": "unexpected_closing_bracket",
                     "message": f"Unexpected '{character}'",
-                    "line": line_number
+                    "line": line_number,
+                    "column": column
                 })
 
             else:
 
-                opening_bracket, opening_line = stack.pop()
+                opening_bracket, opening_line, _ = stack.pop()
 
-                expected_opening = CLOSING_BRACKETS[character]
-
-                # Wrong type of closing bracket
-                if opening_bracket != expected_opening:
+                if opening_bracket != CLOSING_BRACKETS[character]:
 
                     errors.append({
                         "type": "mismatched_bracket",
                         "message": (
-                            f"Unexpected '{character}'. "
-                            f"Expected closing bracket for "
-                            f"'{opening_bracket}'"
+                            f"Unexpected '{character}': expected "
+                            f"'{OPENING_BRACKETS[opening_bracket]}' to close "
+                            f"'{opening_bracket}' opened on line "
+                            f"{opening_line}"
                         ),
-                        "line": line_number
+                        "line": line_number,
+                        "column": column
                     })
-
-        # =========================================
-        # LINE NUMBER
-        # =========================================
-        if character == "\n":
-            line_number += 1
 
         i += 1
 
     # =============================================
     # MISSING CLOSING BRACKETS
     # =============================================
-    while stack:
-
-        opening_bracket, opening_line = stack.pop()
+    for opening_bracket, opening_line, opening_column in stack:
 
         errors.append({
             "type": "missing_closing_bracket",
@@ -206,7 +166,11 @@ def validate_brackets(code):
                 f"Missing closing bracket for "
                 f"'{opening_bracket}'"
             ),
-            "line": opening_line
+            "line": opening_line,
+            "column": opening_column
         })
+
+    # Report errors in source order
+    errors.sort(key=lambda e: (e["line"], e["column"]))
 
     return errors

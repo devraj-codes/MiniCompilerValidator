@@ -3,62 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>Mini Compiler Validator</title>
+
+    <!-- Optional fonts: the app falls back to system fonts if these fail to load -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <div class="container">
+    <header class="app-header">
+        <div class="brand">
+            <div class="logo" aria-hidden="true">&lt;/&gt;</div>
+            <div>
+                <h1>Mini Compiler Validator</h1>
+                <p class="subtitle">Lexical Analysis &amp; Syntax Validation</p>
+            </div>
+        </div>
+        <div class="status" id="backendStatus" data-state="ready" role="status">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="backendStatusText">Ready</span>
+        </div>
+    </header>
 
-        <h1>Mini Compiler Validator</h1>
+    <main class="dashboard">
 
-        <p>Enter your C code below:</p>
+        <!-- ============ EDITOR ============ -->
+        <section class="panel editor-panel" aria-labelledby="editorTitle">
+            <div class="panel-head">
+                <h2 id="editorTitle"><span class="lang-chip">C</span> Source code</h2>
+                <span class="counter" id="editorCounter">0 lines · 0 chars</span>
+            </div>
 
-        <textarea id="codeInput" placeholder="Write your C code here..."></textarea>
+            <div class="editor">
+                <div class="gutter" id="lineNumbers" aria-hidden="true">1</div>
+                <label for="codeInput" class="visually-hidden">C source code</label>
+                <textarea id="codeInput" spellcheck="false" autocomplete="off"
+                    placeholder="#include &lt;stdio.h&gt;&#10;&#10;int main() {&#10;    int count = 0;&#10;    return 0;&#10;}"></textarea>
+            </div>
 
-        <button id="validateBtn">
-            Validate Code
-        </button>
+            <div class="editor-actions">
+                <button id="validateBtn" type="button">
+                    <span class="btn-icon" aria-hidden="true">✓</span>
+                    <span class="btn-label">Validate Code</span>
+                </button>
+                <span class="hint">Runs against your Flask server on port 5000</span>
+            </div>
+        </section>
 
+        <!-- ============ RESULTS ============ -->
         <div id="result">
 
-        <h2>Tokens</h2>
+            <section class="stats" aria-label="Validation overview">
+                <div class="stat"><span class="stat-label">Tokens</span><span class="stat-value" id="statTokens">–</span></div>
+                <div class="stat"><span class="stat-label">Identifiers</span><span class="stat-value" id="statIdentifiers">–</span></div>
+                <div class="stat" id="statErrorsCard"><span class="stat-label">Errors</span><span class="stat-value" id="statErrors">–</span></div>
+                <div class="stat" id="statBracketsCard"><span class="stat-label">Brackets</span><span class="stat-value" id="statBrackets">–</span></div>
+            </section>
 
-        <table id="tokenTable">
+            <div id="banner" class="banner" hidden></div>
 
-            <thead>
-                <tr>
-                    <th>Lexeme</th>
-                    <th>Token Type</th>
-                    <th>Line</th>
-                </tr>
-            </thead>
+            <section class="panel results-panel">
+                <div class="tabs" role="tablist" aria-label="Validation results">
+                    <button class="tab" role="tab" id="tab-tokens" aria-controls="panel-tokens" aria-selected="true">Tokens</button>
+                    <button class="tab" role="tab" id="tab-errors" aria-controls="panel-errors" aria-selected="false" tabindex="-1">Errors</button>
+                    <button class="tab" role="tab" id="tab-identifiers" aria-controls="panel-identifiers" aria-selected="false" tabindex="-1">Identifiers</button>
+                    <button class="tab" role="tab" id="tab-brackets" aria-controls="panel-brackets" aria-selected="false" tabindex="-1">Brackets</button>
+                </div>
 
-            <tbody id="tokenTableBody">
-            </tbody>
+                <div class="tab-panel" id="panel-tokens" role="tabpanel" aria-labelledby="tab-tokens">
+                    <h2 class="visually-hidden">Tokens</h2>
+                    <div class="table-wrap">
+                        <table id="tokenTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Lexeme</th>
+                                    <th scope="col">Token Type</th>
+                                    <th scope="col">Line</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tokenTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
 
-        </table>
+                <div class="tab-panel" id="panel-errors" role="tabpanel" aria-labelledby="tab-errors" hidden>
+                    <h2 class="visually-hidden">Errors</h2>
+                    <div id="errorList">No errors yet.</div>
+                </div>
 
-        <h2>Errors</h2>
+                <div class="tab-panel" id="panel-identifiers" role="tabpanel" aria-labelledby="tab-identifiers" hidden>
+                    <h2 class="visually-hidden">Identifier Validation</h2>
+                    <div id="identifierList">No identifier analysis yet.</div>
+                </div>
 
-        <div id="errorList">
-        No errors yet.
+                <div class="tab-panel" id="panel-brackets" role="tabpanel" aria-labelledby="tab-brackets" hidden>
+                    <h2 class="visually-hidden">PDA / Bracket Analysis</h2>
+                    <div id="bracketList">No bracket analysis yet.</div>
+                </div>
+            </section>
         </div>
-
-        <h2>Identifier Validation</h2>
-
-        <div id="identifierList">
-            No identifier analysis yet.
-        </div>
-
-    </div>
-
-    </div>
+    </main>
 
     <script src="script.js"></script>
-
 </body>
 </html>
