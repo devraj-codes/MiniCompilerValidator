@@ -1,14 +1,13 @@
 // =========================================================
-// ELEMENT REFERENCES (all original IDs preserved)
+// MINI COMPILER VALIDATOR - TOC DEVELOPER DASHBOARD SCRIPT
 // =========================================================
+
+// --- PRESERVED ORIGINAL ELEMENT REFERENCES ---
 const codeInput = document.getElementById("codeInput");
 const validateBtn = document.getElementById("validateBtn");
-
 const tokenTableBody = document.getElementById("tokenTableBody");
 const errorList = document.getElementById("errorList");
 const identifierList = document.getElementById("identifierList");
-
-// New UI elements
 const bracketList = document.getElementById("bracketList");
 const lineNumbers = document.getElementById("lineNumbers");
 const editorCounter = document.getElementById("editorCounter");
@@ -23,144 +22,167 @@ const statBrackets = document.getElementById("statBrackets");
 const statErrorsCard = document.getElementById("statErrorsCard");
 const statBracketsCard = document.getElementById("statBracketsCard");
 
-const tabs = Array.from(document.querySelectorAll(".tab"));
-const panels = Array.from(document.querySelectorAll(".tab-panel"));
+// --- NEW DASHBOARD REFERENCES ---
+const overallStatusCard = document.getElementById("overallStatusCard");
+const heroIcon = document.getElementById("heroIcon");
+const heroTitle = document.getElementById("heroTitle");
+const heroSubtitle = document.getElementById("heroSubtitle");
 
+const pipeLexer = document.getElementById("pipeLexer");
+const pipeDfa = document.getElementById("pipeDfa");
+const pipePda = document.getElementById("pipePda");
+const pipeCfg = document.getElementById("pipeCfg");
+const pipeTree = document.getElementById("pipeTree");
+
+const sampleSelect = document.getElementById("sampleSelect");
+const copyCodeBtn = document.getElementById("copyCodeBtn");
+const clearCodeBtn = document.getElementById("clearCodeBtn");
+const tokenSearchInput = document.getElementById("tokenSearchInput");
+const tokenCountBadge = document.getElementById("tokenCountBadge");
+const dfaStatusBadge = document.getElementById("dfaStatusBadge");
+const pdaStatusBadge = document.getElementById("pdaStatusBadge");
+const lexicalStatusBadge = document.getElementById("lexicalStatusBadge");
+const syntaxAnalysisContainer = document.getElementById("syntaxAnalysisContainer");
+const parseTreeContainer = document.getElementById("parseTreeContainer");
+
+const navBadgeTokens = document.getElementById("navBadgeTokens");
+const navBadgeDfa = document.getElementById("navBadgeDfa");
+const navBadgePda = document.getElementById("navBadgePda");
+const navBadgeLex = document.getElementById("navBadgeLex");
+
+const navPills = Array.from(document.querySelectorAll(".nav-pill"));
+const resultCards = Array.from(document.querySelectorAll(".result-card"));
+
+// Cached list of current tokens for search/filter
+let currentTokensList = [];
 
 // =========================================================
-// HELPERS
+// SAMPLE PRESET CODES
+// =========================================================
+const SAMPLE_PRESETS = {
+    "valid": `int main() {
+    int x = 10;
+
+    if (x > 5) {
+        printf("Hello");
+    }
+
+    return 0;
+}`,
+    "dfa-error": `int main() {
+    int 5student = 20;
+    int while = 10;
+
+    return 0;
+}`,
+    "pda-error": `int main() {
+    int x = 10;
+
+    if (x > 0) {
+        printf("Missing closing brace");
+
+    return 0;
+}`,
+    "lexical-error": `int main() {
+    int @invalid = 100;
+    char #flag = 'A';
+
+    return 0;
+}`,
+    "complex-valid": `int main() {
+    int count = 0;
+    int total = 100;
+
+    while (count < 5) {
+        count = count + 1;
+        printf("Current count: %d", count);
+    }
+
+    if (total >= 100) {
+        return 1;
+    } else {
+        return 0;
+    }
+}`
+};
+
+// =========================================================
+// UTILITY HELPERS
 // =========================================================
 function esc(value) {
-    const div = document.createElement("div");
-    div.textContent = value === undefined || value === null ? "" : String(value);
-    return div.innerHTML;
+    if (value === undefined || value === null) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
 }
 
-function emptyState(icon, title, text, extraClass) {
-    return `
-        <div class="empty ${extraClass || ""}">
-            <div class="icon">${icon}</div>
-            <div class="title">${title}</div>
-            <p>${text}</p>
-        </div>
-    `;
+function classifyTokenType(type) {
+    const t = String(type).toUpperCase();
+    if (["INT", "FLOAT", "CHAR", "IF", "ELSE", "WHILE", "RETURN", "PRINTF"].includes(t)) {
+        return { category: "Keyword", className: "badge-keyword" };
+    }
+    if (t === "IDENTIFIER") {
+        return { category: "Identifier", className: "badge-identifier" };
+    }
+    if (t === "NUMBER") {
+        return { category: "Literal Number", className: "badge-number" };
+    }
+    if (["STRING", "CHARACTER"].includes(t)) {
+        return { category: "Literal", className: "badge-string" };
+    }
+    if (["PLUS", "MINUS", "MULTIPLY", "DIVIDE", "MODULO", "ASSIGN", "EQUAL", "NOT_EQUAL", "GREATER", "LESS", "GREATER_EQUAL", "LESS_EQUAL"].includes(t)) {
+        return { category: "Operator", className: "badge-operator" };
+    }
+    return { category: "Delimiter", className: "badge-delimiter" };
 }
 
-function issueCard(glyph, error, label) {
-    return `
-        <div class="card error">
-            <span class="glyph" aria-hidden="true">⚠</span>
-            <div class="body">
-                <div class="title">${esc(label || error.type)}</div>
-                <div class="msg">${esc(error.message)}</div>
-            </div>
-            <span class="meta">Line ${esc(error.line)}</span>
-        </div>
-    `;
-}
-
-function successCard(title, text) {
-    return `
-        <div class="card success">
-            <span class="glyph" aria-hidden="true">✓</span>
-            <div class="body">
-                <div class="title">${title}</div>
-                <div class="msg">${text}</div>
-            </div>
-        </div>
-    `;
-}
-
-// Stable hue per token type so any type from the backend gets a colour
-function hueFor(text) {
-    let hash = 0;
-    for (const ch of String(text)) hash = (hash * 31 + ch.charCodeAt(0)) % 360;
-    return hash;
-}
-
-function setTabCount(name, count, bad) {
-    const tab = document.getElementById("tab-" + name);
-    const label = name.charAt(0).toUpperCase() + name.slice(1);
-    tab.innerHTML = count === null
-        ? label
-        : `${label}<span class="count ${bad ? "bad" : ""}">${count}</span>`;
-}
-
-function setStat(card, value, tone) {
-    value.textContent = tone.text;
-    card.classList.remove("good", "bad");
-    if (tone.state) card.classList.add(tone.state);
-}
-
-function showBanner(type, text) {
-    banner.hidden = false;
-    banner.className = "banner " + type;
-    banner.innerHTML = `<span aria-hidden="true">${type === "ok" ? "✓" : "⚠"}</span> ${text}`;
+function setPipelineStage(el, status, text) {
+    if (!el) return;
+    el.classList.remove("passed", "failed", "ready-stage", "planned-stage");
+    if (status) el.classList.add(status);
+    const stateEl = el.querySelector(".stage-state");
+    if (stateEl) stateEl.textContent = text;
 }
 
 function setStatus(state, text) {
-    backendStatus.dataset.state = state;
-    backendStatusText.textContent = text;
+    if (backendStatus) backendStatus.dataset.state = state;
+    if (backendStatusText) backendStatusText.textContent = text;
+}
+
+function showBanner(type, text) {
+    if (!banner) return;
+    banner.hidden = false;
+    banner.className = "banner " + type;
+    banner.innerHTML = `<span aria-hidden="true">${type === "ok" ? "✓" : "⚠"}</span> ${esc(text)}`;
 }
 
 function setLoading(isLoading) {
     validateBtn.disabled = isLoading;
     validateBtn.classList.toggle("loading", isLoading);
-    validateBtn.querySelector(".btn-icon").textContent = isLoading ? "⟳" : "✓";
-    validateBtn.querySelector(".btn-label").textContent =
-        isLoading ? "Analyzing..." : "Validate Code";
+    const label = validateBtn.querySelector(".btn-label");
+    if (label) label.textContent = isLoading ? "Analyzing..." : "Validate Code";
     validateBtn.setAttribute("aria-busy", String(isLoading));
 }
 
-function resetStats() {
-    [statTokens, statIdentifiers, statErrors, statBrackets].forEach(el => el.textContent = "–");
-    statErrorsCard.classList.remove("good", "bad");
-    statBracketsCard.classList.remove("good", "bad");
-    ["tokens", "errors", "identifiers", "brackets"].forEach(n => setTabCount(n, null));
-    banner.hidden = true;
-}
-
-
 // =========================================================
-// TABS (keyboard: arrow keys, Home, End)
-// =========================================================
-function selectTab(tab) {
-    tabs.forEach(function (t) {
-        const active = t === tab;
-        t.setAttribute("aria-selected", String(active));
-        t.tabIndex = active ? 0 : -1;
-    });
-    panels.forEach(function (p) {
-        p.hidden = p.id !== tab.getAttribute("aria-controls");
-    });
-}
-
-tabs.forEach(function (tab, i) {
-    tab.addEventListener("click", () => selectTab(tab));
-    tab.addEventListener("keydown", function (e) {
-        let next = null;
-        if (e.key === "ArrowRight") next = tabs[(i + 1) % tabs.length];
-        if (e.key === "ArrowLeft") next = tabs[(i - 1 + tabs.length) % tabs.length];
-        if (e.key === "Home") next = tabs[0];
-        if (e.key === "End") next = tabs[tabs.length - 1];
-        if (next) { e.preventDefault(); next.focus(); selectTab(next); }
-    });
-});
-
-
-// =========================================================
-// EDITOR: line numbers + counter
+// EDITOR: LINE NUMBERS & SYNCHRONIZATION
 // =========================================================
 function updateEditor() {
     const text = codeInput.value;
     const lines = text.split("\n").length;
 
     let numbers = "";
-    for (let i = 1; i <= lines; i++) numbers += i + "\n";
+    for (let i = 1; i <= lines; i++) {
+        numbers += i + "\n";
+    }
     lineNumbers.textContent = numbers.trimEnd();
 
-    editorCounter.textContent =
-        `${lines} ${lines === 1 ? "line" : "lines"} · ${text.length} chars`;
+    if (editorCounter) {
+        editorCounter.textContent = `${lines} ${lines === 1 ? "line" : "lines"} · ${text.length} chars`;
+    }
     lineNumbers.scrollTop = codeInput.scrollTop;
 }
 
@@ -169,248 +191,552 @@ codeInput.addEventListener("scroll", function () {
     lineNumbers.scrollTop = codeInput.scrollTop;
 });
 
-// Insert 4 spaces on Tab (Esc then Tab still leaves the field for keyboard users)
+// Handle Tab key (indent 4 spaces)
 codeInput.addEventListener("keydown", function (e) {
-    if (e.key === "Escape") codeInput.dataset.escaped = "1";
-    if (e.key === "Tab" && !e.shiftKey && !codeInput.dataset.escaped) {
+    if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        const s = codeInput.selectionStart;
-        codeInput.setRangeText("    ", s, codeInput.selectionEnd, "end");
+        const start = codeInput.selectionStart;
+        codeInput.setRangeText("    ", start, codeInput.selectionEnd, "end");
         updateEditor();
-    } else if (e.key !== "Escape") {
-        delete codeInput.dataset.escaped;
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        validateBtn.click();
     }
 });
 
-updateEditor();
+// Preset selector handler
+if (sampleSelect) {
+    sampleSelect.addEventListener("change", function () {
+        const key = sampleSelect.value;
+        if (SAMPLE_PRESETS[key]) {
+            codeInput.value = SAMPLE_PRESETS[key];
+            updateEditor();
+            sampleSelect.value = "";
+            codeInput.focus();
+        }
+    });
+}
 
+// Copy button
+if (copyCodeBtn) {
+    copyCodeBtn.addEventListener("click", async function () {
+        try {
+            await navigator.clipboard.writeText(codeInput.value);
+            const originalText = copyCodeBtn.querySelector("span").textContent;
+            copyCodeBtn.querySelector("span").textContent = "Copied!";
+            setTimeout(() => {
+                copyCodeBtn.querySelector("span").textContent = originalText;
+            }, 1800);
+        } catch (err) {
+            console.error("Clipboard copy failed:", err);
+        }
+    });
+}
+
+// Clear button
+if (clearCodeBtn) {
+    clearCodeBtn.addEventListener("click", function () {
+        codeInput.value = "";
+        updateEditor();
+        resetToInitialState();
+        codeInput.focus();
+    });
+}
 
 // =========================================================
-// VALIDATE
+// STAGE VIEW FILTERING (Tabs / Pills)
+// =========================================================
+navPills.forEach(pill => {
+    pill.addEventListener("click", function () {
+        navPills.forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+
+        const target = pill.dataset.target;
+        if (target === "all") {
+            resultCards.forEach(card => card.classList.remove("hidden"));
+        } else {
+            resultCards.forEach(card => {
+                if (card.id === target) {
+                    card.classList.remove("hidden");
+                    card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                } else {
+                    card.classList.add("hidden");
+                }
+            });
+        }
+    });
+});
+
+// =========================================================
+// TOKEN SEARCH / FILTER
+// =========================================================
+if (tokenSearchInput) {
+    tokenSearchInput.addEventListener("input", function () {
+        const query = tokenSearchInput.value.trim().toLowerCase();
+        renderTokenRows(query);
+    });
+}
+
+function renderTokenRows(query = "") {
+    if (!currentTokensList || currentTokensList.length === 0) {
+        tokenTableBody.innerHTML = `
+            <tr>
+                <td colspan="3">
+                    <div class="empty-state">
+                        <div class="empty-icon">&lt;/&gt;</div>
+                        <div class="empty-title">No tokens generated yet</div>
+                        <p>Run validation to tokenize Mini-C source code.</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const filtered = query
+        ? currentTokensList.filter(t =>
+            String(t.value).toLowerCase().includes(query) ||
+            String(t.type).toLowerCase().includes(query) ||
+            String(t.line).includes(query)
+        )
+        : currentTokensList;
+
+    if (filtered.length === 0) {
+        tokenTableBody.innerHTML = `
+            <tr>
+                <td colspan="3">
+                    <div class="empty-state">
+                        <div class="empty-icon">∅</div>
+                        <div class="empty-title">No matching tokens</div>
+                        <p>No tokens matched the search filter "${esc(query)}".</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tokenTableBody.innerHTML = filtered.map(token => {
+        const info = classifyTokenType(token.type);
+        return `
+            <tr>
+                <td><code>${esc(token.value)}</code></td>
+                <td><span class="badge-token ${info.className}">${esc(token.type)}</span></td>
+                <td>Line ${esc(token.line)} : Col ${esc(token.column || 1)}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+// =========================================================
+// RESET / INITIAL STATE
+// =========================================================
+function resetToInitialState() {
+    statTokens.textContent = "–";
+    statIdentifiers.textContent = "–";
+    statErrors.textContent = "–";
+    statBrackets.textContent = "–";
+
+    statErrorsCard.classList.remove("good", "bad");
+    statBracketsCard.classList.remove("good", "bad");
+
+    navBadgeTokens.textContent = "0";
+    navBadgeDfa.textContent = "0";
+    navBadgePda.textContent = "0";
+    navBadgeLex.textContent = "0";
+
+    tokenCountBadge.textContent = "0 tokens";
+    dfaStatusBadge.textContent = "Pending";
+    dfaStatusBadge.className = "badge-status";
+    pdaStatusBadge.textContent = "Pending";
+    pdaStatusBadge.className = "badge-status";
+    lexicalStatusBadge.textContent = "Pending";
+    lexicalStatusBadge.className = "badge-status";
+
+    overallStatusCard.className = "overall-status-card ready";
+    heroIcon.innerHTML = `
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+    `;
+    heroTitle.textContent = "READY FOR VALIDATION";
+    heroSubtitle.textContent = "Enter Mini-C source code and click 'Validate Code' to run TOC analysis.";
+
+    setPipelineStage(pipeLexer, "", "Pending");
+    setPipelineStage(pipeDfa, "", "Pending");
+    setPipelineStage(pipePda, "", "Pending");
+    setPipelineStage(pipeCfg, "ready-stage", "Ready");
+    setPipelineStage(pipeTree, "planned-stage", "Planned");
+
+    currentTokensList = [];
+    renderTokenRows();
+
+    identifierList.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-icon">DFA</div>
+            <div class="empty-title">No identifier analysis yet</div>
+            <p>Identified tokens will be processed through the DFA state transitions.</p>
+        </div>
+    `;
+
+    bracketList.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-icon">{ }</div>
+            <div class="empty-title">No bracket analysis yet</div>
+            <p>Brackets will be pushed and popped on the PDA stack to check balance.</p>
+        </div>
+    `;
+
+    errorList.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-icon">✓</div>
+            <div class="empty-title">No lexical scan performed yet</div>
+            <p>Errors like illegal symbols or unclosed comments will appear here.</p>
+        </div>
+    `;
+
+    if (banner) banner.hidden = true;
+}
+
+// Initialize on page load
+if (codeInput.value.trim() === "") {
+    codeInput.value = SAMPLE_PRESETS["valid"];
+}
+updateEditor();
+resetToInitialState();
+
+// =========================================================
+// VALIDATION LOGIC
 // =========================================================
 validateBtn.addEventListener("click", async function () {
-
-    if (validateBtn.disabled) return;   // block simultaneous requests
+    if (validateBtn.disabled) return;
 
     const code = codeInput.value;
 
-    // -----------------------------------------
-    // CHECK EMPTY INPUT
-    // -----------------------------------------
+    // 1. EMPTY INPUT CHECK
     if (code.trim() === "") {
-
-        tokenTableBody.innerHTML = "";
-        resetStats();
-
-        const empty = emptyState(
-            "&lt;/&gt;",
-            "No source code provided",
-            "Enter C code above and run validation."
-        );
-
-        tokenTableBody.innerHTML = `<tr><td colspan="3">${empty}</td></tr>`;
-        errorList.innerHTML = empty;
-        identifierList.innerHTML = empty;
-        bracketList.innerHTML = empty;
+        resetToInitialState();
+        overallStatusCard.className = "overall-status-card invalid";
+        heroIcon.innerHTML = `
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+        `;
+        heroTitle.textContent = "EMPTY SOURCE CODE";
+        heroSubtitle.textContent = "Please enter Mini-C code or select a preset sample from the toolbar.";
+        showBanner("warn", "No source code provided for validation.");
         codeInput.focus();
         return;
     }
 
-    // -----------------------------------------
-    // RESET PREVIOUS RESULTS
-    // -----------------------------------------
-    resetStats();
-    tokenTableBody.innerHTML = "";
-    errorList.innerHTML = "<p>Analyzing code...</p>";
-    identifierList.innerHTML = "<p>Analyzing identifiers...</p>";
-    bracketList.innerHTML = "<p>Analyzing brackets...</p>";
-
+    // 2. SET LOADING STATE
     setLoading(true);
     setStatus("busy", "Analyzing...");
 
-    // -----------------------------------------
-    // SEND CODE TO FLASK (unchanged endpoint & body)
-    // -----------------------------------------
+    overallStatusCard.className = "overall-status-card busy";
+    heroIcon.innerHTML = `
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+        </svg>
+    `;
+    heroTitle.textContent = "ANALYZING MINI-C PROGRAM...";
+    heroSubtitle.textContent = "Running Lexical Scanner, DFA Identifiers, and PDA Bracket Verification...";
+
+    // 3. SEND REQUEST TO FLASK BACKEND
     try {
-
-        const response = await fetch(
-            "http://127.0.0.1:5000/validate",
-            {
-                method: "POST",
-
-                headers: {
-                    "Content-Type": "application/json"
-                },
-
-                body: JSON.stringify({
-                    code: code
-                })
-            }
-        );
+        const response = await fetch("http://127.0.0.1:5000/validate", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                code: code
+            })
+        });
 
         if (!response.ok) {
-            throw new Error(`Server returned ${response.status}`);
+            throw new Error(`Server returned HTTP ${response.status} (${response.statusText})`);
         }
 
         const data = await response.json();
-        setStatus("connected", "Backend connected");
+        setStatus("connected", "Backend Connected");
 
+        // Extract backend arrays
         const tokens = data.tokens || [];
+        const lexicalErrors = data.lexical_errors || [];
+        const identifierErrors = data.identifier_errors || [];
+        const bracketErrors = data.bracket_errors || [];
+        const totalErrors = lexicalErrors.length + identifierErrors.length + bracketErrors.length;
+        const isValid = (data.success !== undefined) ? data.success : (totalErrors === 0);
 
-        // -----------------------------------------
-        // DISPLAY TOKENS
-        // -----------------------------------------
-        if (tokens.length > 0) {
+        // -----------------------------------------------------
+        // CARD 1: RENDER TOKENS
+        // -----------------------------------------------------
+        currentTokensList = tokens;
+        renderTokenRows(tokenSearchInput ? tokenSearchInput.value.trim().toLowerCase() : "");
+        tokenCountBadge.textContent = `${tokens.length} token${tokens.length === 1 ? "" : "s"}`;
+        navBadgeTokens.textContent = tokens.length;
+        statTokens.textContent = tokens.length;
 
-            tokens.forEach(function (token) {
+        // -----------------------------------------------------
+        // CARD 2: DFA / IDENTIFIER ANALYSIS
+        // -----------------------------------------------------
+        // Identify valid identifier tokens vs those flagged in identifier_errors
+        const rejectedValues = new Set(identifierErrors.map(e => String(e.value || "")));
+        const validIdentifiers = tokens.filter(t => t.type === "IDENTIFIER" && !rejectedValues.has(String(t.value)));
 
-                const row = document.createElement("tr");
+        const totalIdentifiersExamined = validIdentifiers.length + identifierErrors.length;
+        statIdentifiers.textContent = totalIdentifiersExamined;
+        navBadgeDfa.textContent = identifierErrors.length > 0 ? `${identifierErrors.length} err` : totalIdentifiersExamined;
 
-                const lexemeCell = document.createElement("td");
-                lexemeCell.textContent = token.value;
+        let dfaHtml = "";
 
-                const typeCell = document.createElement("td");
-                const badge = document.createElement("span");
-                badge.className = "badge";
-                badge.style.setProperty("--h", hueFor(token.type));
-                badge.textContent = token.type;
-                typeCell.appendChild(badge);
+        // First render REJECTED identifiers prominently
+        if (identifierErrors.length > 0) {
+            dfaStatusBadge.textContent = `${identifierErrors.length} Rejected`;
+            dfaStatusBadge.className = "badge-status reject";
 
-                const lineCell = document.createElement("td");
-                lineCell.textContent = token.line;
-
-                row.appendChild(lexemeCell);
-                row.appendChild(typeCell);
-                row.appendChild(lineCell);
-
-                tokenTableBody.appendChild(row);
-            });
-
+            dfaHtml += identifierErrors.map(err => `
+                <div class="card-issue">
+                    <span class="card-issue-glyph">✕</span>
+                    <div class="card-issue-body">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span class="item-name" style="color: var(--error-light);">${esc(err.value || "Invalid Identifier")}</span>
+                            <span class="pill-reject">✕ REJECT</span>
+                        </div>
+                        <div class="card-issue-msg" style="margin-top: 4px;">${esc(err.message)}</div>
+                        <div class="card-issue-pos">Line ${esc(err.line)}${err.column ? `, Column ${esc(err.column)}` : ""} · DFA Trap/Dead State</div>
+                    </div>
+                </div>
+            `).join("");
         } else {
-            tokenTableBody.innerHTML = `
-                <tr><td colspan="3">${emptyState("{ }", "No tokens found", "The analyzer returned no tokens for this input.")}</td></tr>
+            dfaStatusBadge.textContent = "Accepted";
+            dfaStatusBadge.className = "badge-status accept";
+        }
+
+        // Then render ACCEPTED identifiers
+        if (validIdentifiers.length > 0) {
+            dfaHtml += `<div class="analysis-item-list" style="margin-top: 6px;">` + validIdentifiers.map(id => `
+                <div class="analysis-item">
+                    <div class="item-left">
+                        <span class="item-icon" style="color: var(--success);">✓</span>
+                        <span class="item-name">${esc(id.value)}</span>
+                    </div>
+                    <div class="item-right">
+                        <span class="item-meta">Line ${esc(id.line)}${id.column ? `, Col ${esc(id.column)}` : ""}</span>
+                        <span class="pill-accept">✓ ACCEPT</span>
+                    </div>
+                </div>
+            `).join("") + `</div>`;
+        } else if (identifierErrors.length === 0) {
+            dfaHtml = `
+                <div class="empty-state">
+                    <div class="empty-icon">id</div>
+                    <div class="empty-title">No identifiers detected</div>
+                    <p>This code contains no identifier variables or function names to validate.</p>
+                </div>
             `;
         }
 
-        // -----------------------------------------
-        // DISPLAY LEXICAL ERRORS
-        // -----------------------------------------
-        const lexicalErrors = data.lexical_errors || [];
+        identifierList.innerHTML = dfaHtml;
 
-        if (lexicalErrors.length === 0) {
-            errorList.innerHTML = successCard("No lexical errors found", "Every character was recognised by the lexer.");
-        } else {
-            errorList.innerHTML = lexicalErrors.map(e => issueCard("⚠", e)).join("");
-        }
-
-        // -----------------------------------------
-        // IDENTIFIERS
-        // -----------------------------------------
-        const identifiers = tokens.filter(t => t.type === "IDENTIFIER");
-        const identifierErrors = data.identifier_errors || [];
-
-        identifierList.innerHTML = "";
-
-        if (identifiers.length === 0) {
-            identifierList.innerHTML = emptyState("id", "No identifiers found", "This code contains no identifiers to validate.");
-        } else {
-            identifierList.innerHTML = identifiers.map(function (identifier) {
-                return `
-                    <div class="card identifier-item">
-                        <span class="name">${esc(identifier.value)}</span>
-                        <span class="pill">✓ ACCEPTED</span>
-                        <span class="meta">Line ${esc(identifier.line)}</span>
-                    </div>
-                `;
-            }).join("");
-        }
-
-        // -----------------------------------------
-        // INVALID IDENTIFIER ERRORS
-        // -----------------------------------------
-        if (identifierErrors.length > 0) {
-            identifierList.insertAdjacentHTML(
-                "beforeend",
-                identifierErrors.map(e => issueCard("⚠", e)).join("")
-            );
-        }
-
-        // -----------------------------------------
-        // PDA / BRACKET VALIDATION
-        // -----------------------------------------
-        const bracketErrors = data.bracket_errors || [];
+        // -----------------------------------------------------
+        // CARD 3: PDA / BRACKET ANALYSIS
+        // -----------------------------------------------------
+        navBadgePda.textContent = bracketErrors.length === 0 ? "✓" : `${bracketErrors.length} err`;
 
         if (bracketErrors.length === 0) {
-            bracketList.innerHTML = successCard("Brackets balanced", "All brackets are properly matched.");
+            pdaStatusBadge.textContent = "Balanced";
+            pdaStatusBadge.className = "badge-status accept";
+            statBrackets.textContent = "✓ Balanced";
+            statBracketsCard.classList.remove("bad");
+            statBracketsCard.classList.add("good");
+
+            bracketList.innerHTML = `
+                <div class="card-success">
+                    <span class="card-success-glyph">✓</span>
+                    <div class="card-success-body">
+                        <div class="card-success-title">PDA Bracket Validation Passed</div>
+                        <div class="card-success-msg">All parentheses (), curly braces {}, and brackets [] are properly balanced and nested.</div>
+                        <div class="stack-status-pill">PDA Stack: [ Empty λ / Z₀ ] · Accepted by Empty Stack</div>
+                    </div>
+                </div>
+            `;
         } else {
-            bracketList.innerHTML = bracketErrors.map(e => issueCard("⚠", e, "Bracket error: " + e.type)).join("");
+            pdaStatusBadge.textContent = `${bracketErrors.length} Error${bracketErrors.length === 1 ? "" : "s"}`;
+            pdaStatusBadge.className = "badge-status reject";
+            statBrackets.textContent = `${bracketErrors.length} Error${bracketErrors.length === 1 ? "" : "s"}`;
+            statBracketsCard.classList.remove("good");
+            statBracketsCard.classList.add("bad");
+
+            bracketList.innerHTML = bracketErrors.map(err => `
+                <div class="card-issue">
+                    <span class="card-issue-glyph">✕</span>
+                    <div class="card-issue-body">
+                        <div class="card-issue-title">PDA Bracket Imbalance</div>
+                        <div class="card-issue-msg">${esc(err.message)}</div>
+                        <div class="card-issue-pos">Line ${esc(err.line)}${err.column ? `, Column ${esc(err.column)}` : ""} · LIFO Stack Mismatch</div>
+                    </div>
+                </div>
+            `).join("");
         }
 
-        // -----------------------------------------
-        // OVERVIEW STATS (all derived from the response)
-        // -----------------------------------------
-        const errorTotal =
-            lexicalErrors.length + identifierErrors.length + bracketErrors.length;
+        // -----------------------------------------------------
+        // CARD 4: LEXICAL ERRORS
+        // -----------------------------------------------------
+        navBadgeLex.textContent = lexicalErrors.length === 0 ? "0" : lexicalErrors.length;
 
-        statTokens.textContent = tokens.length;
-        statIdentifiers.textContent = identifiers.length;
-        setStat(statErrorsCard, statErrors, {
-            text: errorTotal,
-            state: errorTotal === 0 ? "good" : "bad"
-        });
-        setStat(statBracketsCard, statBrackets, bracketErrors.length === 0
-            ? { text: "✓ Balanced", state: "good" }
-            : { text: bracketErrors.length + " error" + (bracketErrors.length === 1 ? "" : "s"), state: "bad" });
+        if (lexicalErrors.length === 0) {
+            lexicalStatusBadge.textContent = "Valid";
+            lexicalStatusBadge.className = "badge-status accept";
 
-        setTabCount("tokens", tokens.length);
-        setTabCount("errors", lexicalErrors.length, lexicalErrors.length > 0);
-        setTabCount("identifiers", identifiers.length + identifierErrors.length, identifierErrors.length > 0);
-        setTabCount("brackets", bracketErrors.length === 0 ? "✓" : bracketErrors.length, bracketErrors.length > 0);
-
-        // -----------------------------------------
-        // FINAL STATUS
-        // -----------------------------------------
-        if (data.success) {
-            showBanner("ok", "Validation complete");
-            console.log("Validation completed successfully.");
+            errorList.innerHTML = `
+                <div class="card-success">
+                    <span class="card-success-glyph">✓</span>
+                    <div class="card-success-body">
+                        <div class="card-success-title">No Lexical Errors Detected</div>
+                        <div class="card-success-msg">Every character and escape sequence belongs to the recognized Mini-C alphabet Σ.</div>
+                    </div>
+                </div>
+            `;
         } else {
-            showBanner("warn", `Validation finished with ${errorTotal} issue${errorTotal === 1 ? "" : "s"}`);
-            console.log("Validation completed with errors.");
+            lexicalStatusBadge.textContent = `${lexicalErrors.length} Error${lexicalErrors.length === 1 ? "" : "s"}`;
+            lexicalStatusBadge.className = "badge-status reject";
+
+            errorList.innerHTML = lexicalErrors.map(err => `
+                <div class="card-issue">
+                    <span class="card-issue-glyph">✕</span>
+                    <div class="card-issue-body">
+                        <div class="card-issue-title">Lexical Error</div>
+                        <div class="card-issue-msg">${esc(err.message)}</div>
+                        <div class="card-issue-pos">Line ${esc(err.line)}${err.column ? `, Column ${esc(err.column)}` : ""} · Character Rejected by Scanner</div>
+                    </div>
+                </div>
+            `).join("");
         }
 
-    }
+        // -----------------------------------------------------
+        // CARD 5: CFG / SYNTAX ANALYSIS (Ready for parser response)
+        // -----------------------------------------------------
+        if (data.syntax_errors && data.syntax_errors.length > 0) {
+            syntaxAnalysisContainer.innerHTML = data.syntax_errors.map(err => `
+                <div class="card-issue">
+                    <span class="card-issue-glyph">✕</span>
+                    <div class="card-issue-body">
+                        <div class="card-issue-title">Syntax Error</div>
+                        <div class="card-issue-msg">${esc(err.message || "Grammar derivation failed")}</div>
+                        <div class="card-issue-pos">Line ${esc(err.line || 1)} · Expected token mismatch</div>
+                    </div>
+                </div>
+            `).join("");
+            setPipelineStage(pipeCfg, "failed", "Syntax Err");
+        } else if (data.syntax_valid === true) {
+            syntaxAnalysisContainer.innerHTML = `
+                <div class="card-success">
+                    <span class="card-success-glyph">✓</span>
+                    <div class="card-success-body">
+                        <div class="card-success-title">Syntax Valid</div>
+                        <div class="card-success-msg">Mini-C program adheres to context-free grammar production rules.</div>
+                    </div>
+                </div>
+            `;
+            setPipelineStage(pipeCfg, "passed", "Passed");
+        } else {
+            // Default stage when parser module is under development
+            setPipelineStage(pipeCfg, "ready-stage", "Ready");
+        }
 
-    // -----------------------------------------
-    // CONNECTION ERROR
-    // -----------------------------------------
-    catch (error) {
+        // -----------------------------------------------------
+        // CARD 6: PARSE TREE (Ready for Graphviz / SVG response)
+        // -----------------------------------------------------
+        if (data.parse_tree_svg) {
+            parseTreeContainer.innerHTML = data.parse_tree_svg;
+            setPipelineStage(pipeTree, "passed", "Generated");
+        } else if (data.parse_tree_image) {
+            parseTreeContainer.innerHTML = `<img src="${esc(data.parse_tree_image)}" alt="Parse Tree" style="max-width: 100%; height: auto;">`;
+            setPipelineStage(pipeTree, "passed", "Generated");
+        } else {
+            setPipelineStage(pipeTree, "planned-stage", "Planned");
+        }
 
-        console.error("Validation error:", error);
+        // -----------------------------------------------------
+        // OVERALL STATS & SUMMARY
+        // -----------------------------------------------------
+        statErrors.textContent = totalErrors;
+        if (totalErrors === 0) {
+            statErrorsCard.classList.remove("bad");
+            statErrorsCard.classList.add("good");
+        } else {
+            statErrorsCard.classList.remove("good");
+            statErrorsCard.classList.add("bad");
+        }
 
-        setStatus("offline", "Backend offline");
-        tokenTableBody.innerHTML = "";
+        // Update pipeline tracker
+        setPipelineStage(pipeLexer, lexicalErrors.length === 0 ? "passed" : "failed", lexicalErrors.length === 0 ? "Passed" : "Errors");
+        setPipelineStage(pipeDfa, identifierErrors.length === 0 ? "passed" : "failed", identifierErrors.length === 0 ? "Passed" : "Rejected");
+        setPipelineStage(pipePda, bracketErrors.length === 0 ? "passed" : "failed", bracketErrors.length === 0 ? "Balanced" : "Mismatch");
+
+        // Final Hero Banner
+        if (isValid) {
+            overallStatusCard.className = "overall-status-card valid";
+            heroIcon.innerHTML = `
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            `;
+            heroTitle.textContent = "VALID PROGRAM";
+            heroSubtitle.textContent = "All validation stages passed successfully. Tokens, DFA identifiers, and PDA brackets are verified.";
+            showBanner("ok", "Validation complete: 0 errors detected.");
+        } else {
+            overallStatusCard.className = "overall-status-card invalid";
+            heroIcon.innerHTML = `
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            `;
+            heroTitle.textContent = "VALIDATION FAILED";
+            heroSubtitle.textContent = `${totalErrors} issue${totalErrors === 1 ? "" : "s"} found during analysis (Lexical: ${lexicalErrors.length}, DFA: ${identifierErrors.length}, PDA: ${bracketErrors.length}).`;
+            showBanner("warn", `Validation failed with ${totalErrors} issue${totalErrors === 1 ? "" : "s"}.`);
+        }
+
+    } catch (err) {
+        console.error("Backend validation error:", err);
+        setStatus("offline", "Backend Offline");
+
+        overallStatusCard.className = "overall-status-card invalid";
+        heroIcon.innerHTML = `
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+        `;
+        heroTitle.textContent = "BACKEND CONNECTION FAILED";
+        heroSubtitle.textContent = "Unable to connect to Flask server at http://127.0.0.1:5000/validate. Ensure the Python backend is active.";
 
         errorList.innerHTML = `
-            <div class="error card">
-                <span class="glyph" aria-hidden="true">⚠</span>
-                <div class="body">
-                    <div class="title">Backend Connection Failed</div>
-                    <div class="msg">
-                        Unable to connect to the Flask validation server.
-                        Make sure the Flask server is running on port 5000.
+            <div class="card-issue">
+                <span class="card-issue-glyph">⚠</span>
+                <div class="card-issue-body">
+                    <div class="card-issue-title">Flask Server Unreachable</div>
+                    <div class="card-issue-msg">
+                        The application could not establish a connection to <code>http://127.0.0.1:5000/validate</code>.<br>
+                        Please run <code>python backend/app.py</code> in your terminal to start the Flask server.
                     </div>
                 </div>
             </div>
         `;
 
-        identifierList.innerHTML = "<p>Identifier analysis unavailable.</p>";
-        bracketList.innerHTML = "<p>Bracket analysis unavailable.</p>";
-        showBanner("warn", "Backend connection failed");
-        selectTab(document.getElementById("tab-errors"));
-    }
+        identifierList.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 12px;">DFA identifier analysis unavailable while backend is offline.</p>`;
+        bracketList.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem; padding: 12px;">PDA bracket analysis unavailable while backend is offline.</p>`;
+        showBanner("warn", "Cannot reach Flask validation server on port 5000.");
 
-    finally {
+    } finally {
         setLoading(false);
     }
-
 });
